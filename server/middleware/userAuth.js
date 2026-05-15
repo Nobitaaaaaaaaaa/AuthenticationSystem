@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 
 const userAuth=(req,res,next)=>{
-    const token=req.cookies;
+    const {token}=req.cookies;
 
     if(!token){
         return res.json({success:false,message:'Unauthorized'});
@@ -12,7 +12,7 @@ const userAuth=(req,res,next)=>{
         
 
         if(tokenDecode.id){
-            req.userId=tokenDecode.id;
+            req.body.userId=tokenDecode.id;
         }else{
             return res.json({success:false,message:'Unauthorized'});    
         }

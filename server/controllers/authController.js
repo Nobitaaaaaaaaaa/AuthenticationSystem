@@ -134,7 +134,7 @@ export const sendVerifyOtp = async (req, res) => {
     }
 };
 
-export const verifyEmail=async(req,res)=>{
+export const verifyEmail = async(req,res)=>{
     const {userId,otp}=req.body;
 
     if(!userId||!otp){
@@ -166,3 +166,82 @@ export const verifyEmail=async(req,res)=>{
         res.json({success:false,message:error.message});
     }
 };
+
+export const isAuthenticated=async(req,res)=>{
+    try{
+            return res.json({success:true,message:'User is authenticated',user:{name:req.body.name,email:req.body.email}});
+
+    }catch(error){
+        res.json({success:false,message:error.message});
+    }
+}
+
+//send password reset otp
+export const sendResetOtp=async(req,res)=>{
+    
+    const {email}=req.body;
+    if(!email){
+        return res.json({success:false,message:'Email is required'});
+    }
+    try{
+        const user=await userModel.findOne({email});
+        if(!user){
+            return res.json({success:false,message:'User does not exist'});
+        }
+
+        const Otp = Math.floor(100000 + Math.random() * 900000).toString();
+        user.resetOtp = Otp;
+        user.verifyOtpExpireAt = Date.now() + 10 * 60 * 1000; // OTP valid for 10 minutes
+
+        await user.save();
+
+        const mailOptions={
+            from:process.env.SENDER_EMAIL,
+            to:user.email,
+            subject:'Password Reset OTP',
+            text:`Hello ${user.name},\n\nYour OTP for password reset is: ${Otp}\n\nThis OTP is valid for 10 minutes.\n\nBest regards,\nThe Team`,
+
+        };
+
+        await transporter.sendMail(mailOptions);
+        res.json({success:true,message:'OTP sent to your email'});
+
+    }catch(error){  
+        res.json({success:false,message:error.message});
+    }
+}
+
+//reset user pasword
+export const resetPassword=async(req,res)=>{
+    const {email,otp,newPassword}=req.body;
+
+    if(!email||!otp||!newPassword){
+        return res.json({success:false,message:'All fields are required'});
+    }
+
+    try{
+        const user=await userModel.findOne({email});
+        if(!user){
+            return res.json({success:false,message:'User does not exist'});
+        }
+        if(user.resetOtp!==otp){
+            return res.json({success:false,message:'Invalid OTP'});
+        }
+        if(user.resetOtpExpireAt<Date.now()){
+            return res.json({success:false,message:'OTP has expired'});
+        }  
+        
+        const hashedPassword=await bcrypt.hash(newPassword,10);
+        user.password=hashedPassword;
+        user.resetOtp='';
+        user.resetOtpExpireAt=0;
+
+        await user.save();
+
+        return res.json({success:true,message:'Password reset successfully'});
+        
+    }
+    catch(error){  
+        res.json({success:false,message:error.message});
+    }
+}
